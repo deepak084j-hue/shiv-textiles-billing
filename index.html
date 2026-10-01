@@ -52,12 +52,15 @@ table{width:100%;border-collapse:collapse;font-size:13px}th,td{padding:9px 5px;b
 </div>
 
 <div class="card">
-<h3 style="margin-top:0">Add product</h3>
+<h3 style="margin-top:0">Add item to bill</h3>
 <div class="grid">
 <div><label>Product</label><select id="productSelect"></select></div>
 <div><label>Quantity</label><input id="qty" type="number" min="1" value="1"></div>
+<div><label>Rate (₹)</label><input id="manualRate" type="number" min="0" placeholder="Selling rate"></div>
+<div><label>Product name (optional manual entry)</label><input id="manualName" placeholder="e.g. 6x4 Chatai"></div>
 <div class="full row"><button class="btn primary" id="addBtn">+ Add to bill</button><button class="btn secondary" id="clearCartBtn">Clear bill</button></div>
 </div>
+<p class="muted" style="margin-bottom:0">You can either select a saved product, or type a product name and rate manually for this bill.</p>
 </div>
 
 <div class="card">
@@ -147,8 +150,9 @@ function money(n){return '₹'+Number(n||0).toFixed(2)}
 function toast(s){$('toast').textContent=s;$('toast').style.display='block';setTimeout(()=>$('toast').style.display='none',1800)}
 function refreshSelect(){
  const s=$('productSelect');s.innerHTML='';
- data.products.forEach(p=>{const o=document.createElement('option');o.value=p.id;o.textContent=`${p.name} — ${money(p.price)}${p.stock>0?' • stock '+p.stock:''}`;s.appendChild(o)})
- if(!data.products.length){s.innerHTML='<option>No products. Add one first.</option>'}
+ const sortedProducts=[...data.products].sort((a,b)=>a.name.localeCompare(b.name,undefined,{sensitivity:'base'}));
+ sortedProducts.forEach(p=>{const o=document.createElement('option');o.value=p.id;o.textContent=`${p.name} — ${money(p.price)}${p.stock>0?' • stock '+p.stock:''}`;s.appendChild(o)})
+ if(!sortedProducts.length){s.innerHTML='<option>No products. Add one first.</option>'}
 }
 function renderProducts(){
  $('productList').innerHTML=data.products.length?data.products.map(p=>`
@@ -166,12 +170,21 @@ function renderCart(){
 }
 function removeCart(i){cart.splice(i,1);renderCart()}
 function addToCart(){
- if(!data.products.length)return toast('Add a product first');
- const p=data.products.find(x=>x.id==$('productSelect').value), q=Math.max(1,+$('qty').value||1);
- if(!p)return; if(p.stock>0 && q>p.stock)return toast('Not enough stock');
- const existing=cart.find(x=>x.id===p.id);
- if(existing) existing.qty+=q; else cart.push({id:p.id,name:p.name,price:p.price,qty:q,unit:p.unit});
- renderCart();$('qty').value=1
+ const manualName=$('manualName').value.trim();
+ const manualRate=+$('manualRate').value||0;
+ const q=Math.max(1,+$('qty').value||1);
+ if(manualName){
+   if(manualRate<=0)return toast('Enter the rate');
+   cart.push({id:null,name:manualName,price:manualRate,qty:q,unit:'piece'});
+ } else {
+   if(!data.products.length)return toast('Add a product first');
+   const p=data.products.find(x=>x.id==$('productSelect').value);
+   if(!p)return toast('Select a product');
+   if(p.stock>0 && q>p.stock)return toast('Not enough stock');
+   const existing=cart.find(x=>x.id===p.id);
+   if(existing) existing.qty+=q; else cart.push({id:p.id,name:p.name,price:p.price,qty:q,unit:p.unit});
+ }
+ renderCart();$('qty').value=1;$('manualRate').value='';$('manualName').value=''
 }
 function addProduct(){
  const name=$('pName').value.trim(),price=+$('pPrice').value||0,stock=+$('pStock').value||0,unit=$('pUnit').value.trim()||'piece';
